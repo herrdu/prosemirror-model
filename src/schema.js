@@ -43,7 +43,7 @@ function initAttrs(attrs) {
 // [tag](#model.Node.type) `Node` instances. They contain information
 // about the node type, such as its name and what kind of node it
 // represents.
-export class NodeType {
+export class NodeType<S extends Schema = any> {
   constructor(name, schema, spec) {
     // :: string
     // The name the node type has in this schema.
@@ -232,7 +232,7 @@ class Attribute {
 // things like emphasis or being part of a link) are
 // [tagged](#model.Mark.type) with type objects, which are
 // instantiated once per `Schema`.
-export class MarkType {
+export class MarkType<S extends Schema = any> {
   constructor(name, rank, schema, spec) {
     // :: string
     // The name of the mark type.

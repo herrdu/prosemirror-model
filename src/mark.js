@@ -6,7 +6,7 @@ import {compareDeep} from "./comparedeep"
 // (such as the target of the link). Marks are created through a
 // `Schema`, which controls which types exist and which
 // attributes they have.
-export class Mark {
+export class Mark<S extends Schema = any> {
   constructor(type, attrs) {
     // :: MarkType
     // The type of this mark.

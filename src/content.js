@@ -1,10 +1,11 @@
 import {Fragment} from "./fragment"
+import { Schema } from "./schema"
 
 // ::- Instances of this class represent a match state of a node
 // type's [content expression](#model.NodeSpec.content), and can be
 // used to find out whether further content matches here, and whether
 // a given position is a valid end of the node.
-export class ContentMatch {
+export class ContentMatch<S extends Schema = any> {
   constructor(validEnd) {
     // :: bool
     // True when this match state represents a valid end of the node.
