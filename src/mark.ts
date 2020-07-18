@@ -1,4 +1,5 @@
-import {compareDeep} from "./comparedeep"
+import { compareDeep } from "./comparedeep";
+import { Schema, MarkType } from "./schema";
 
 // ::- A mark is a piece of information that can be attached to a node,
 // such as it being emphasized, in code font, or a link. It has a type
@@ -7,13 +8,16 @@ import {compareDeep} from "./comparedeep"
 // `Schema`, which controls which types exist and which
 // attributes they have.
 export class Mark<S extends Schema = any> {
-  constructor(type, attrs) {
+  type: MarkType<S>;
+  attrs: { [key: string]: any };
+
+  constructor(type: MarkType<S>, attrs: { [key: string]: any }) {
     // :: MarkType
     // The type of this mark.
-    this.type = type
+    this.type = type;
     // :: Object
     // The attributes associated with this mark.
-    this.attrs = attrs
+    this.attrs = attrs;
   }
 
   // :: ([Mark]) → [Mark]
@@ -22,95 +26,98 @@ export class Mark<S extends Schema = any> {
   // the set itself is returned. If any marks that are set to be
   // [exclusive](#model.MarkSpec.excludes) with this mark are present,
   // those are replaced by this one.
-  addToSet(set) {
-    let copy, placed = false
+  addToSet(set: Mark<S>[]) {
+    let copy: Mark<S>[],
+      placed = false;
     for (let i = 0; i < set.length; i++) {
-      let other = set[i]
-      if (this.eq(other)) return set
+      let other = set[i];
+      if (this.eq(other)) return set;
       if (this.type.excludes(other.type)) {
-        if (!copy) copy = set.slice(0, i)
+        if (!copy) copy = set.slice(0, i);
       } else if (other.type.excludes(this.type)) {
-        return set
+        return set;
       } else {
         if (!placed && other.type.rank > this.type.rank) {
-          if (!copy) copy = set.slice(0, i)
-          copy.push(this)
-          placed = true
+          if (!copy) copy = set.slice(0, i);
+          copy.push(this);
+          placed = true;
         }
-        if (copy) copy.push(other)
+        if (copy) copy.push(other);
       }
     }
-    if (!copy) copy = set.slice()
-    if (!placed) copy.push(this)
-    return copy
+    if (!copy) copy = set.slice();
+    if (!placed) copy.push(this);
+    return copy;
   }
 
   // :: ([Mark]) → [Mark]
   // Remove this mark from the given set, returning a new set. If this
   // mark is not in the set, the set itself is returned.
-  removeFromSet(set) {
-    for (let i = 0; i < set.length; i++)
-      if (this.eq(set[i]))
-        return set.slice(0, i).concat(set.slice(i + 1))
-    return set
+  removeFromSet(set: Mark[]) {
+    for (let i = 0; i < set.length; i++) if (this.eq(set[i])) return set.slice(0, i).concat(set.slice(i + 1));
+    return set;
   }
 
   // :: ([Mark]) → bool
   // Test whether this mark is in the given set of marks.
-  isInSet(set) {
-    for (let i = 0; i < set.length; i++)
-      if (this.eq(set[i])) return true
-    return false
+  isInSet(set: Mark[]) {
+    for (let i = 0; i < set.length; i++) if (this.eq(set[i])) return true;
+    return false;
   }
 
   // :: (Mark) → bool
   // Test whether this mark has the same type and attributes as
   // another mark.
-  eq(other) {
-    return this == other ||
-      (this.type == other.type && compareDeep(this.attrs, other.attrs))
+  eq(other: Mark) {
+    return this == other || (this.type == other.type && compareDeep(this.attrs, other.attrs));
   }
 
   // :: () → Object
   // Convert this mark to a JSON-serializeable representation.
   toJSON() {
-    let obj = {type: this.type.name}
+    let obj: {
+      type: string;
+      attrs?: { [key: string]: any };
+    } = { type: this.type.name };
     for (let _ in this.attrs) {
-      obj.attrs = this.attrs
-      break
+      obj.attrs = this.attrs;
+      break;
     }
-    return obj
+    return obj;
   }
 
   // :: (Schema, Object) → Mark
-  static fromJSON(schema, json) {
-    if (!json) throw new RangeError("Invalid input for Mark.fromJSON")
-    let type = schema.marks[json.type]
-    if (!type) throw new RangeError(`There is no mark type ${json.type} in this schema`)
-    return type.create(json.attrs)
+  static fromJSON<S extends Schema = any>(schema: S, json: { [key: string]: any }): Mark<S> {
+    if (!json) throw new RangeError("Invalid input for Mark.fromJSON");
+    let type = schema.marks[json.type];
+    if (!type) throw new RangeError(`There is no mark type ${json.type} in this schema`);
+    return type.create(json.attrs);
   }
 
   // :: ([Mark], [Mark]) → bool
   // Test whether two sets of marks are identical.
-  static sameSet(a, b) {
-    if (a == b) return true
-    if (a.length != b.length) return false
-    for (let i = 0; i < a.length; i++)
-      if (!a[i].eq(b[i])) return false
-    return true
+  static sameSet<S extends Schema = any>(a: Array<Mark<S>>, b: Array<Mark<S>>): boolean {
+    if (a == b) return true;
+    if (a.length != b.length) return false;
+    for (let i = 0; i < a.length; i++) if (!a[i].eq(b[i])) return false;
+    return true;
   }
 
   // :: (?union<Mark, [Mark]>) → [Mark]
   // Create a properly sorted mark set from null, a single mark, or an
   // unsorted array of marks.
-  static setFrom(marks) {
-    if (!marks || marks.length == 0) return Mark.none
-    if (marks instanceof Mark) return [marks]
-    let copy = marks.slice()
-    copy.sort((a, b) => a.type.rank - b.type.rank)
-    return copy
+  static setFrom<S extends Schema = any>(marks?: Mark<S> | Array<Mark<S>>): Array<Mark<S>> {
+    // XXX 去掉了 || marks.length == 0
+    if (!marks) return Mark.none;
+    if (marks instanceof Mark) return [marks];
+    let copy = marks.slice();
+    copy.sort((a, b) => a.type.rank - b.type.rank);
+    return copy;
   }
 }
 
 // :: [Mark] The empty set of marks.
-Mark.none = []
+export namespace Mark {
+  export const none = [];
+  export const empty = [];
+}

@@ -1,4 +1,63 @@
 import { Node as ProsemirrorNode } from "./node";
+import OrderedMap = require("orderedmap");
+import { Mark } from "./mark";
+import { Schema } from "./schema";
+import { ContentMatch } from "./content";
+import { ResolvedPos } from "./resolvedpos";
+import { Fragment } from "./fragment";
+
+export interface MarkSpec {
+  /**
+   * The attributes that marks of this type get.
+   */
+  attrs?: { [name: string]: AttributeSpec } | null;
+  /**
+   * Whether this mark should be active when the cursor is positioned
+   * at its end (or at its start when that is also the start of the
+   * parent node). Defaults to true.
+   */
+  inclusive?: boolean | null;
+  /**
+   * Determines which other marks this mark can coexist with. Should
+   * be a space-separated strings naming other marks or groups of marks.
+   * When a mark is [added](#model.Mark.addToSet) to a set, all marks
+   * that it excludes are removed in the process. If the set contains
+   * any mark that excludes the new mark but is not, itself, excluded
+   * by the new mark, the mark can not be added an the set. You can
+   * use the value `"_"` to indicate that the mark excludes all
+   * marks in the schema.
+   *
+   * Defaults to only being exclusive with marks of the same type. You
+   * can set it to an empty string (or any string not containing the
+   * mark's own name) to allow multiple marks of a given type to
+   * coexist (as long as they have different attributes).
+   */
+  excludes?: string | null;
+  /**
+   * The group or space-separated groups to which this mark belongs.
+   */
+  group?: string | null;
+  /**
+   * Determines whether marks of this type can span multiple adjacent
+   * nodes when serialized to DOM/HTML. Defaults to true.
+   */
+  spanning?: boolean | null;
+  /**
+   * Defines the default way marks of this type should be serialized
+   * to DOM/HTML.
+   */
+  toDOM?: ((mark: Mark, inline: boolean) => DOMOutputSpec) | null;
+  /**
+   * Associates DOM parser information with this mark (see the
+   * corresponding [node spec field](#model.NodeSpec.parseDOM)). The
+   * `mark` field in the rules is implied.
+   */
+  parseDOM?: ParseRule[] | null;
+  /**
+   * Allow specifying arbitrary fields on a MarkSpec.
+   */
+  [key: string]: any;
+}
 
 /**
  * Used to [define](#model.NodeSpec.attrs) attributes on nodes or
@@ -12,6 +71,34 @@ export interface AttributeSpec {
    * created.
    */
   default?: any;
+}
+
+/**
+ * An object describing a schema, as passed to the [`Schema`](#model.Schema)
+ * constructor.
+ */
+export interface SchemaSpec<N extends string = any, M extends string = any> {
+  /**
+   * The node types in this schema. Maps names to
+   * [`NodeSpec`](#model.NodeSpec) objects that describe the node type
+   * associated with that name. Their order is significant—it
+   * determines which [parse rules](#model.NodeSpec.parseDOM) take
+   * precedence by default, and which nodes come first in a given
+   * [group](#model.NodeSpec.group).
+   */
+  nodes: { [name in N]: NodeSpec } | OrderedMap<NodeSpec>;
+  /**
+   * The mark types that exist in this schema. The order in which they
+   * are provided determines the order in which [mark
+   * sets](#model.Mark.addToSet) are sorted and in which [parse
+   * rules](#model.MarkSpec.parseDOM) are tried.
+   */
+  marks?: { [name in M]: MarkSpec } | OrderedMap<MarkSpec> | null;
+  /**
+   * The name of the default top-level node for the schema. Defaults
+   * to `"doc"`.
+   */
+  topNode?: string | null;
 }
 
 export interface NodeSpec {
@@ -131,6 +218,58 @@ export interface DOMOutputSpecArray {
   9?: DOMOutputSpec | 0;
 }
 export type DOMOutputSpec = string | Node | DOMOutputSpecArray;
+
+/**
+ * These are the options recognized by the
+ * [`parse`](#model.DOMParser.parse) and
+ * [`parseSlice`](#model.DOMParser.parseSlice) methods.
+ */
+export interface ParseOptions<S extends Schema = any> {
+  /**
+   * By default, whitespace is collapsed as per HTML's rules. Pass
+   * `true` to preserve whitespace, but normalize newlines to
+   * spaces, and `"full"` to preserve whitespace entirely.
+   */
+  preserveWhitespace?: boolean | "full" | null;
+  /**
+   * When given, the parser will, beside parsing the content,
+   * record the document positions of the given DOM positions. It
+   * will do so by writing to the objects, adding a `pos` property
+   * that holds the document position. DOM positions that are not
+   * in the parsed content will not be written to.
+   */
+  findPositions?: Array<{ node: Node; offset: number }> | null;
+  /**
+   * The child node index to start parsing from.
+   */
+  from?: number | null;
+  /**
+   * The child node index to stop parsing at.
+   */
+  to?: number | null;
+  /**
+   * By default, the content is parsed into the schema's default
+   * [top node type](#model.Schema.topNodeType). You can pass this
+   * option to use the type and attributes from a different node
+   * as the top container.
+   */
+  topNode?: ProsemirrorNode<S> | null;
+  /**
+   * Provide the starting content match that content parsed into the
+   * top node is matched against.
+   */
+  topMatch?: ContentMatch | null;
+  /**
+   * A set of additional nodes to count as
+   * [context](#model.ParseRule.context) when parsing, above the
+   * given [top node](#model.ParseOptions.topNode).
+   */
+  context?: ResolvedPos<S> | null;
+
+  // XXX 一下属性是使用者根据代码添加
+  ruleFromNode?: (dom: Node) => ParseRule;
+  topOpen?: boolean;
+}
 
 /**
  * A value that describes how to parse a given DOM node or inline

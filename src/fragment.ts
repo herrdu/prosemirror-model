@@ -291,7 +291,7 @@ export class Fragment<S extends Schema = any> {
   // of nodes. For `null`, it returns the empty fragment. For a
   // fragment, the fragment itself. For a node or array of nodes, a
   // fragment containing those nodes.
-  static from<S extends Schema = any>(nodes: ProsemirrorNode<S>) {
+  static from<S extends Schema = any>(nodes: Fragment<S> | ProsemirrorNode<S> | Array<ProsemirrorNode<S>>) {
     if (!nodes) return Fragment.empty;
     if (nodes instanceof Fragment) return nodes;
     if (Array.isArray(nodes)) return this.fromArray(nodes);
