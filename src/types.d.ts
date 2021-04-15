@@ -6,6 +6,13 @@ import { ContentMatch } from "./content";
 import { ResolvedPos } from "./resolvedpos";
 import { Fragment } from "./fragment";
 
+declare global {
+  interface Element {
+    msMatchesSelector(selectors: string): boolean;
+    mozMatchesSelector(selectors: string): boolean;
+  }
+}
+
 export interface MarkSpec {
   /**
    * The attributes that marks of this type get.
@@ -379,4 +386,12 @@ export interface ParseRule {
    * newlines should also be preserved.
    */
   preserveWhitespace?: boolean | "full" | null;
+}
+
+export interface ParseRuleForTag extends ParseRule {
+  tag: string;
+}
+
+export interface ParseRuleForStyle extends ParseRule {
+  style: string;
 }

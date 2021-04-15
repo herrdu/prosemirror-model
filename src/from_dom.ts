@@ -2,8 +2,8 @@ import { Fragment } from "./fragment";
 import { Slice } from "./replace";
 import { Mark } from "./mark";
 import { Schema, NodeType, MarkType } from "./schema";
-import { ParseRule, ParseOptions, NodeSpec } from "./types";
-import { Node as ProsemirrorNode } from "./node";
+import { ParseRule, ParseOptions, NodeSpec, ParseRuleForTag, ParseRuleForStyle } from "./types";
+import { Node as ProsemirrorNode, TextNode } from "./node";
 
 // ParseOptions:: interface
 // These are the options recognized by the
@@ -150,8 +150,8 @@ export class DOMParser<S extends Schema = any> {
    */
   rules: ParseRule[];
 
-  tags: any[];
-  styles: any[];
+  tags: ParseRuleForTag[];
+  styles: ParseRuleForStyle[];
 
   // :: (Schema, [ParseRule])
   // Create a parser that targets the given schema, using the given
@@ -168,8 +168,8 @@ export class DOMParser<S extends Schema = any> {
     this.styles = [];
 
     rules.forEach((rule) => {
-      if (rule.tag) this.tags.push(rule);
-      else if (rule.style) this.styles.push(rule);
+      if (rule.tag) this.tags.push(rule as ParseRuleForTag);
+      else if (rule.style) this.styles.push(rule as ParseRuleForStyle);
     });
   }
 
@@ -198,7 +198,7 @@ export class DOMParser<S extends Schema = any> {
     for (let i = 0; i < this.tags.length; i++) {
       let rule = this.tags[i];
       if (
-        matches(dom, rule.tag) &&
+        matches(dom as Element, rule.tag) &&
         (rule.namespace === undefined || dom.namespaceURI == rule.namespace) &&
         (!rule.context || context.matchesContext(rule.context))
       ) {
@@ -335,16 +335,16 @@ function wsOptionsFor(preserveWhitespace) {
 }
 
 class NodeContext {
-  type: any;
+  type: NodeType;
   attrs: NodeSpec["attrs"];
   solid: any;
   match: any;
   options: any;
-  content: any;
-  marks: any;
+  content: Array<ProsemirrorNode>;
+  marks: Mark[];
   activeMarks: any;
 
-  constructor(type: any, attrs: NodeSpec["attrs"], marks: any, solid: any, match: any, options: any) {
+  constructor(type: NodeType, attrs: NodeSpec["attrs"], marks: Mark[], solid: any, match: any, options: any) {
     this.type = type;
     this.attrs = attrs;
     this.solid = solid;
@@ -358,12 +358,12 @@ class NodeContext {
   findWrapping(node: ProsemirrorNode) {
     if (!this.match) {
       if (!this.type) return [];
-      let fill = this.type.contentMatch.fillBefore(Fragment.from(node));
+      let fill = this.type.contentMatch.fillBefore(Fragment.from(node) as Fragment);
       if (fill) {
         this.match = this.type.contentMatch.matchFragment(fill);
       } else {
         let start = this.type.contentMatch,
-          wrap;
+          wrap: Array<NodeType> | null | undefined;
         if ((wrap = start.findWrapping(node.type))) {
           this.match = start;
           return wrap;
@@ -382,10 +382,13 @@ class NodeContext {
         m: any;
       if (last && last.isText && (m = /[ \t\r\n\u000c]+$/.exec(last.text))) {
         if (last.text.length == m[0].length) this.content.pop();
-        else this.content[this.content.length - 1] = last.withText(last.text.slice(0, last.text.length - m[0].length));
+        else
+          this.content[this.content.length - 1] = (last as TextNode).withText(
+            last.text.slice(0, last.text.length - m[0].length)
+          );
       }
     }
-    let content = Fragment.from(this.content);
+    let content = Fragment.from(this.content) as Fragment;
     if (!openEnd && this.match) content = content.append(this.match.fillBefore(Fragment.empty, true));
     return this.type ? this.type.create(this.attrs, content, this.marks) : content;
   }
@@ -395,7 +398,7 @@ class ParseContext {
   parser: DOMParser;
   options: ParseOptions;
   isOpen: boolean;
-  pendingMarks: any[];
+  pendingMarks: Mark[];
 
   nodes: NodeContext[];
   open: number;
@@ -815,7 +818,7 @@ function normalizeList(dom: Node) {
 }
 
 // Apply a CSS selector.
-function matches(dom: any, selector: Element) {
+function matches(dom: Element, selector: string) {
   return (dom.matches || dom.msMatchesSelector || dom.webkitMatchesSelector || dom.mozMatchesSelector).call(
     dom,
     selector

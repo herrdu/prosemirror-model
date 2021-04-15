@@ -51,7 +51,12 @@ export class Node<S extends Schema = any> {
     // :: [Mark]
     // The marks (things like whether it is emphasized or part of a
     // link) applied to this node.
-    this.marks = marks || Mark.none;
+
+    if (marks) {
+      this.marks = type.allowedMarks(marks) || Mark.none;
+    } else {
+      this.marks = Mark.none;
+    }
   }
 
   // text:: ?string
@@ -149,7 +154,7 @@ export class Node<S extends Schema = any> {
 
   // :: (Node) → bool
   // Test whether two nodes represent the same piece of document.
-  eq(other) {
+  eq(other: Node<S>): boolean {
     return this == other || (this.sameMarkup(other) && this.content.eq(other.content));
   }
 
@@ -176,14 +181,14 @@ export class Node<S extends Schema = any> {
   // the given content (or empty, if no content is given).
   copy(content: Fragment<S> | null = null): Node<S> {
     if (content == this.content) return this;
-    return new this.constructor(this.type, this.attrs, content, this.marks);
+    return new (this as any).constructor(this.type, this.attrs, content, this.marks);
   }
 
   // :: ([Mark]) → Node
   // Create a copy of this node, with the given set of marks instead
   // of the node's own marks.
   mark(marks: Mark<S>[]) {
-    return marks == this.marks ? this : new this.constructor(this.type, this.attrs, this.content, marks);
+    return marks == this.marks ? this : new (this as any).constructor(this.type, this.attrs, this.content, marks);
   }
 
   // :: (number, ?number) → Node
@@ -487,7 +492,7 @@ export class TextNode<S extends Schema = any> extends Node<S> {
   }
 }
 
-function wrapMarks(marks, str) {
+function wrapMarks(marks: Mark[], str: string) {
   for (let i = marks.length - 1; i >= 0; i--) str = marks[i].type.name + "(" + str + ")";
   return str;
 }

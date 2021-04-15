@@ -63,7 +63,7 @@ export class Fragment<S extends Schema = any> {
     this.nodesBetween(
       from,
       to,
-      (node: TextNode<S>, pos: number) => {
+      (node: ProsemirrorNode<S>, pos: number) => {
         if (node.isText) {
           text += node.text.slice(Math.max(from, pos) - pos, to - pos);
           separated = !blockSeparator;
@@ -291,7 +291,9 @@ export class Fragment<S extends Schema = any> {
   // of nodes. For `null`, it returns the empty fragment. For a
   // fragment, the fragment itself. For a node or array of nodes, a
   // fragment containing those nodes.
-  static from<S extends Schema = any>(nodes: Fragment<S> | ProsemirrorNode<S> | Array<ProsemirrorNode<S>>) {
+  static from<S extends Schema = any>(
+    nodes: Fragment<S> | ProsemirrorNode<S> | Array<ProsemirrorNode<S>>
+  ): Fragment | ProsemirrorNode | Array<ProsemirrorNode> {
     if (!nodes) return Fragment.empty;
     if (nodes instanceof Fragment) return nodes;
     if (Array.isArray(nodes)) return this.fromArray(nodes);
