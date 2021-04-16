@@ -192,7 +192,7 @@ export class DOMParser<S extends Schema = any> {
   parseSlice(dom: Node, options: ParseOptions = {}) {
     let context = new ParseContext(this, options, true);
     context.addAll(dom, null, options.from, options.to);
-    return Slice.maxOpen(context.finish());
+    return Slice.maxOpen(context.finish() as Fragment);
   }
 
   matchTag(dom: Node, context: ParseContext) {
@@ -686,7 +686,7 @@ class ParseContext {
   closeExtra(openEnd?: boolean) {
     let i = this.nodes.length - 1;
     if (i > this.open) {
-      for (; i > this.open; i--) this.nodes[i - 1].content.push(this.nodes[i].finish(openEnd));
+      for (; i > this.open; i--) this.nodes[i - 1].content.push(this.nodes[i].finish(openEnd) as ProsemirrorNode);
       this.nodes.length = this.open + 1;
     }
   }

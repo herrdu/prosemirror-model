@@ -183,9 +183,8 @@ function joinable($before: ResolvedPos, $after: ResolvedPos, depth: number) {
 
 function addNode(child: ProsemirrorNode, target: ProsemirrorNode[]) {
   let last = target.length - 1;
-  // XXX 由于 node 上无 withText 方法，添加 child instanceof TextNode
-  if (last >= 0 && child.isText && child instanceof TextNode && child.sameMarkup(target[last]))
-    target[last] = child.withText(target[last].text + child.text);
+  if (last >= 0 && child.isText && child.sameMarkup(target[last]))
+    target[last] = (child as TextNode).withText(target[last].text + child.text);
   else target.push(child);
 }
 
@@ -206,7 +205,7 @@ function addRange($start: ResolvedPos, $end: ResolvedPos, depth: number, target:
   if ($end && $end.depth == depth && $end.textOffset) addNode($end.nodeBefore, target);
 }
 
-function close(node, content) {
+function close(node: ProsemirrorNode, content: Fragment) {
   if (!node.type.validContent(content)) throw new ReplaceError("Invalid content for node " + node.type.name);
   return node.copy(content);
 }

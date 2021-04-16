@@ -194,8 +194,8 @@ export class NodeType<S extends Schema = any> {
     marks?: Array<Mark<S>>
   ) {
     content = Fragment.from(content);
-    if (!this.validContent(content)) throw new RangeError("Invalid content for node " + this.name);
-    return new Node(this, this.computeAttrs(attrs), content, Mark.setFrom(marks));
+    if (!this.validContent(content as Fragment)) throw new RangeError("Invalid content for node " + this.name);
+    return new Node(this, this.computeAttrs(attrs), content as Fragment, Mark.setFrom(marks));
   }
 
   // :: (?Object, ?union<Fragment, Node, [Node]>, ?[Mark]) → ?Node
@@ -211,13 +211,13 @@ export class NodeType<S extends Schema = any> {
     marks?: Array<Mark<S>>
   ) {
     attrs = this.computeAttrs(attrs);
-    let content = Fragment.from(_content);
-    if (content.size) {
-      let before = this.contentMatch.fillBefore(content);
+    let content = Fragment.from(_content) as Fragment;
+    if ((content as Fragment).size) {
+      let before = this.contentMatch.fillBefore(content as Fragment);
       if (!before) return null;
       content = before.append(content);
     }
-    let after = this.contentMatch.matchFragment(content).fillBefore(Fragment.empty, true);
+    let after = this.contentMatch.matchFragment(content as Fragment).fillBefore(Fragment.empty, true);
     if (!after) return null;
     return new Node(this, attrs, content.append(after), Mark.setFrom(marks));
   }
