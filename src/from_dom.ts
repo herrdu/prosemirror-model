@@ -4,6 +4,7 @@ import { Mark } from "./mark";
 import { Schema, NodeType, MarkType } from "./schema";
 import { ParseRule, ParseOptions, NodeSpec, ParseRuleForTag, ParseRuleForStyle } from "./types";
 import { Node as ProsemirrorNode, TextNode } from "./node";
+import { ContentMatch } from "./content";
 
 // ParseOptions:: interface
 // These are the options recognized by the
@@ -143,7 +144,7 @@ export class DOMParser<S extends Schema = any> {
   /**
    * The schema into which the parser parses.
    */
-  schema: S;
+  schema: Schema;
   /**
    * The set of [parse rules](#model.ParseRule) that the parser
    * uses, in order of precedence.
@@ -330,21 +331,28 @@ const OPT_PRESERVE_WS = 1,
   OPT_PRESERVE_WS_FULL = 2,
   OPT_OPEN_LEFT = 4;
 
-function wsOptionsFor(preserveWhitespace) {
+function wsOptionsFor(preserveWhitespace?: ParseOptions["preserveWhitespace"]) {
   return (preserveWhitespace ? OPT_PRESERVE_WS : 0) | (preserveWhitespace === "full" ? OPT_PRESERVE_WS_FULL : 0);
 }
 
 class NodeContext {
   type: NodeType;
   attrs: NodeSpec["attrs"];
-  solid: any;
-  match: any;
+  solid: boolean;
+  match: ContentMatch;
   options: any;
   content: Array<ProsemirrorNode>;
   marks: Mark[];
   activeMarks: any;
 
-  constructor(type: NodeType, attrs: NodeSpec["attrs"], marks: Mark[], solid: any, match: any, options: any) {
+  constructor(
+    type: NodeType,
+    attrs: NodeSpec["attrs"],
+    marks: Mark[],
+    solid: boolean,
+    match: ContentMatch,
+    options: any
+  ) {
     this.type = type;
     this.attrs = attrs;
     this.solid = solid;
@@ -375,7 +383,7 @@ class NodeContext {
     return this.match.findWrapping(node.type);
   }
 
-  finish(openEnd: boolean) {
+  finish(openEnd?: boolean) {
     if (!(this.options & OPT_PRESERVE_WS)) {
       // Strip trailing whitespace
       let last = this.content[this.content.length - 1],
@@ -402,7 +410,7 @@ class ParseContext {
 
   nodes: NodeContext[];
   open: number;
-  find: any[];
+  find: Array<{ node: Node; offset: number; pos?: number | null }> | null;
   needsBlock: boolean;
 
   // : (DOMParser, Object)
@@ -447,11 +455,11 @@ class ParseContext {
       this.addTextNode(dom);
     }
     // XXX 原代码中没有，使用者添加的  && dom instanceof Element
-    else if (dom.nodeType == 1 && dom instanceof Element) {
-      let style = dom.getAttribute("style");
+    else if (dom.nodeType == 1) {
+      let style = (dom as Element).getAttribute("style");
       let marks = style ? this.readStyles(parseStyles(style)) : null;
       if (marks != null) for (let i = 0; i < marks.length; i++) this.addPendingMark(marks[i]);
-      this.addElement(dom);
+      this.addElement(dom as Element);
       if (marks != null) for (let i = 0; i < marks.length; i++) this.removePendingMark(marks[i]);
     }
   }
@@ -498,7 +506,7 @@ class ParseContext {
     if (rule ? rule.ignore : ignoreTags.hasOwnProperty(name)) {
       this.findInside(dom);
     } else if (!rule || rule.skip) {
-      if (rule && rule.skip.nodeType) dom = rule.skip;
+      if (rule && (rule.skip as Element).nodeType) dom = rule.skip as Element;
       let sync: boolean,
         top = this.top,
         oldNeedsBlock = this.needsBlock;
@@ -651,7 +659,7 @@ class ParseContext {
   // : (NodeType, ?Object) → bool
   // Try to start a node of the given type, adjusting the context when
   // necessary.
-  enter(type: NodeType, attrs?: { [key: string]: any }, preserveWS?: any) {
+  enter(type: NodeType, attrs?: { [key: string]: any }, preserveWS?: ParseRule["preserveWhitespace"]) {
     let ok = this.findPlace(type.create(attrs));
     if (ok) {
       this.applyPendingMarks(this.top);
@@ -661,10 +669,12 @@ class ParseContext {
   }
 
   // Open a node of the given type
-  enterInner(type: NodeType, attrs?: { [key: string]: any }, solid?: any, preserveWS?: any) {
+  enterInner(type: NodeType, attrs?: NodeType["attrs"], solid?: boolean, preserveWS?: ParseRule["preserveWhitespace"]) {
     this.closeExtra();
     let top = this.top;
-    top.match = top.match && top.match.matchType(type, attrs);
+    // XXX 不需要 attrs 属性
+    // top.match = top.match && top.match.matchType(type, attrs);
+    top.match = top.match && top.match.matchType(type);
     let options = preserveWS == null ? top.options & ~OPT_OPEN_LEFT : wsOptionsFor(preserveWS);
     if (top.options & OPT_OPEN_LEFT && top.content.length == 0) options |= OPT_OPEN_LEFT;
     this.nodes.push(new NodeContext(type, attrs, top.activeMarks, solid, null, options));
@@ -687,7 +697,7 @@ class ParseContext {
     return this.nodes[0].finish(this.isOpen || this.options.topOpen);
   }
 
-  sync(to: any) {
+  sync(to: NodeContext) {
     for (let i = this.open; i >= 0; i--)
       if (this.nodes[i] == to) {
         this.open = i;
@@ -695,11 +705,11 @@ class ParseContext {
       }
   }
 
-  addPendingMark(mark: any) {
+  addPendingMark(mark: Mark) {
     this.pendingMarks.push(mark);
   }
 
-  removePendingMark(mark: any) {
+  removePendingMark(mark: Mark) {
     let found = this.pendingMarks.lastIndexOf(mark);
     if (found > -1) {
       this.pendingMarks.splice(found, 1);
@@ -835,7 +845,7 @@ function parseStyles(style: string): string[] {
   return result;
 }
 
-function copy(obj) {
+function copy(obj: { [key: string]: any }) {
   let copy = {};
   for (let prop in obj) copy[prop] = obj[prop];
   return copy;

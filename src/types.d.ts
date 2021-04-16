@@ -346,7 +346,7 @@ export interface ParseRule {
    * When true, ignore the node that matches this rule, but do parse
    * its content.
    */
-  skip?: boolean | null;
+  skip?: boolean | null | Element;
   /**
    * Attributes for the node or mark created by this rule. When
    * `getAttrs` is provided, it takes precedence.

@@ -174,13 +174,14 @@ export class NodeType<S extends Schema = any> {
   // may be a `Fragment`, a node, an array of nodes, or
   // `null`. Similarly `marks` may be `null` to default to the empty
   // set of marks.
-  create(
-    attrs?: { [key: string]: any } | null,
-    content?: Fragment<S> | Node<S> | Array<Node<S>>,
-    marks?: Array<Mark<S>>
-  ) {
+  create(attrs?: NodeSpec["attrs"], content?: Fragment<S> | Node<S> | Array<Node<S>>, marks?: Array<Mark<S>>) {
     if (this.isText) throw new Error("NodeType.create can't construct text nodes");
-    return new Node(this, this.computeAttrs(attrs), Fragment.from(content as Fragment), Mark.setFrom(marks));
+    return new Node(
+      this,
+      this.computeAttrs(attrs),
+      Fragment.from(content as Fragment) as Fragment,
+      Mark.setFrom(marks)
+    );
   }
 
   // :: (?Object, ?union<Fragment, Node, [Node]>, ?[Mark]) → Node
