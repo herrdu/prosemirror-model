@@ -16,9 +16,9 @@
 // output spec, it should be the only child element in its parent
 // node.
 
-import { Schema } from "./schema";
+import { Schema, NodeType } from "./schema";
 import { Node as ProsemirrorNode, TextNode } from "./node";
-import { DOMOutputSpec, DOMOutputSpecArray } from "./types";
+import { DOMOutputSpec, DOMOutputSpecArray, NodeSpec, MarkSpec } from "./types";
 import { Mark } from "./mark";
 import { Fragment } from "./fragment";
 
@@ -59,7 +59,7 @@ export class DOMSerializer<S extends Schema = any> {
   // not in the browser, the `document` option, containing a DOM
   // document, should be passed so that the serializer can create
   // nodes.
-  serializeFragment(fragment: Fragment, options?: { [key: string]: any }, target?: DocumentFragment) {
+  serializeFragment(fragment: Fragment, options?: { [key: string]: any }, target?: DocumentFragment | Node) {
     if (!target) target = doc(options).createDocumentFragment();
 
     let top = target,
@@ -88,8 +88,8 @@ export class DOMSerializer<S extends Schema = any> {
           let markDOM = this.serializeMark(add, node.isInline, options);
           if (markDOM) {
             active.push(add, top);
-            top.appendChild(markDOM.dom);
-            top = markDOM.contentDOM || markDOM.dom;
+            top.appendChild(markDOM.dom as Node);
+            top = (markDOM.contentDOM || markDOM.dom) as Node;
           }
         }
       }
@@ -105,14 +105,14 @@ export class DOMSerializer<S extends Schema = any> {
   // document. To serialize a whole document, use
   // [`serializeFragment`](#model.DOMSerializer.serializeFragment) on
   // its [content](#model.Node.content).
-  serializeNode(node: ProsemirrorNode, options: { [key: string]: any } = {}) {
+  serializeNode(node: ProsemirrorNode, options: { [key: string]: any } = {}): Node {
     let { dom, contentDOM } = DOMSerializer.renderSpec(doc(options), this.nodes[node.type.name](node));
     if (contentDOM) {
       if (node.isLeaf) throw new RangeError("Content hole not allowed in a leaf node spec");
       if (options.onContent) options.onContent(node, contentDOM, options);
       else this.serializeFragment(node.content, options, contentDOM);
     }
-    return dom;
+    return dom as Node;
   }
 
   serializeNodeAndMarks(node: ProsemirrorNode, options: { [key: string]: any } = {}) {
@@ -120,7 +120,7 @@ export class DOMSerializer<S extends Schema = any> {
     for (let i = node.marks.length - 1; i >= 0; i--) {
       let wrap = this.serializeMark(node.marks[i], node.isInline, options);
       if (wrap) {
-        (wrap.contentDOM || wrap.dom).appendChild(dom);
+        (wrap.contentDOM || (wrap.dom as Node)).appendChild(dom);
         dom = wrap.dom;
       }
     }
@@ -136,11 +136,11 @@ export class DOMSerializer<S extends Schema = any> {
   // Render an [output spec](#model.DOMOutputSpec) to a DOM node. If
   // the spec has a hole (zero) in it, `contentDOM` will point at the
   // node with the hole.
-  static renderSpec(doc: HTMLDocument, structure: DOMOutputSpec) {
+  static renderSpec(doc: HTMLDocument, structure: DOMOutputSpec): { dom: Node; contentDOM?: Node } {
     if (typeof structure == "string") return { dom: doc.createTextNode(structure) };
-    if ((structure as Node).nodeType != null) return { dom: structure };
-    let dom = doc.createElement(structure[0]),
-      contentDOM = null;
+    if ((structure as Node).nodeType != null) return { dom: structure as Node };
+    let dom = doc.createElement(structure[0]) as HTMLElement,
+      contentDOM: null | Node = null;
     let attrs = structure[1],
       start = 1;
     if (attrs && typeof attrs == "object" && attrs.nodeType == null && !Array.isArray(attrs)) {
@@ -157,7 +157,7 @@ export class DOMSerializer<S extends Schema = any> {
         return { dom, contentDOM: dom };
       } else {
         let { dom: inner, contentDOM: innerContent } = DOMSerializer.renderSpec(doc, child);
-        dom.appendChild(inner);
+        dom.appendChild(inner as HTMLElement);
         if (innerContent) {
           if (contentDOM) throw new RangeError("Multiple content holes");
           contentDOM = innerContent;
@@ -170,7 +170,7 @@ export class DOMSerializer<S extends Schema = any> {
   // :: (Schema) → DOMSerializer
   // Build a serializer using the [`toDOM`](#model.NodeSpec.toDOM)
   // properties in a schema's node and mark specs.
-  static fromSchema(schema: Schema) {
+  static fromSchema(schema: Schema): DOMSerializer {
     return (
       schema.cached.domSerializer ||
       (schema.cached.domSerializer = new DOMSerializer(this.nodesFromSchema(schema), this.marksFromSchema(schema)))
@@ -180,22 +180,22 @@ export class DOMSerializer<S extends Schema = any> {
   // : (Schema) → Object<(node: Node) → DOMOutputSpec>
   // Gather the serializers in a schema's node specs into an object.
   // This can be useful as a base to build a custom serializer from.
-  static nodesFromSchema(schema: Schema) {
-    let result = gatherToDOM(schema.nodes);
+  static nodesFromSchema(schema: Schema): { [key: string]: NodeSpec["toDOM"] } {
+    let result = gatherToDOM(schema.nodes) as { [key: string]: NodeSpec["toDOM"] };
     // TODO 确定这里的类型
-    if (!result.text) result.text = (node: any) => node.text;
+    if (!result.text) result.text = (node: ProsemirrorNode) => node.text;
     return result;
   }
 
   // : (Schema) → Object<(mark: Mark) → DOMOutputSpec>
   // Gather the serializers in a schema's mark specs into an object.
-  static marksFromSchema(schema: Schema) {
-    return gatherToDOM(schema.marks);
+  static marksFromSchema(schema: Schema): { [key: string]: MarkSpec["toDOM"] } {
+    return gatherToDOM(schema.marks) as { [key: string]: MarkSpec["toDOM"] };
   }
 }
 
 function gatherToDOM(obj: Schema["nodes"] | Schema["marks"]) {
-  let result: { [key: string]: any } = {};
+  let result: { [key: string]: NodeSpec["toDOM"] | MarkSpec["toDOM"] } = {};
   for (let name in obj) {
     let toDOM = obj[name].spec.toDOM;
     if (toDOM) result[name] = toDOM;

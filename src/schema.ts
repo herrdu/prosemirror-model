@@ -10,7 +10,7 @@ import { NodeSpec, AttributeSpec, SchemaSpec, MarkSpec } from "./types";
 // have any attributes), build up a single reusable default attribute
 // object, and use it for all nodes that don't specify specific
 // attributes.
-function defaultAttrs(attrs: { [name: string]: any }) {
+function defaultAttrs(attrs: NodeType["attrs"]) {
   let defaults = Object.create(null);
   for (let attrName in attrs) {
     let attr = attrs[attrName];
@@ -20,7 +20,7 @@ function defaultAttrs(attrs: { [name: string]: any }) {
   return defaults;
 }
 
-function computeAttrs(attrs: { [name: string]: any }, value: any) {
+function computeAttrs(attrs: NodeType["attrs"], value: any) {
   let built = Object.create(null);
   for (let name in attrs) {
     let given = value && value[name];
@@ -162,7 +162,7 @@ export class NodeType<S extends Schema = any> {
     return this == other || this.contentMatch.compatible(other.contentMatch);
   }
 
-  computeAttrs(attrs?: { [key: string]: any } | null) {
+  computeAttrs(attrs?: NodeType["attrs"]) {
     if (!attrs && this.defaultAttrs) return this.defaultAttrs;
     else return computeAttrs(this.attrs, attrs);
   }
@@ -205,14 +205,10 @@ export class NodeType<S extends Schema = any> {
   // Note that, due to the fact that required nodes can always be
   // created, this will always succeed if you pass null or
   // `Fragment.empty` as content.
-  createAndFill(
-    attrs?: { [key: string]: any } | null,
-    _content?: Fragment<S> | Node<S> | Array<Node<S>>,
-    marks?: Array<Mark<S>>
-  ) {
+  createAndFill(attrs?: NodeType["attrs"], _content?: Fragment<S> | Node<S> | Array<Node<S>>, marks?: Array<Mark<S>>) {
     attrs = this.computeAttrs(attrs);
     let content = Fragment.from(_content) as Fragment;
-    if ((content as Fragment).size) {
+    if (content.size) {
       let before = this.contentMatch.fillBefore(content as Fragment);
       if (!before) return null;
       content = before.append(content);
@@ -261,9 +257,9 @@ export class NodeType<S extends Schema = any> {
     return !copy ? marks : copy.length ? copy : Mark.empty;
   }
 
-  static compile(nodes, schema: Schema) {
+  static compile(nodes: SchemaSpec["nodes"], schema: Schema) {
     let result = Object.create(null);
-    nodes.forEach((name, spec) => (result[name] = new NodeType(name, schema, spec)));
+    nodes.forEach((name: string, spec: NodeSpec) => (result[name] = new NodeType(name, schema, spec)));
 
     let topType = schema.spec.topNode || "doc";
     if (!result[topType]) throw new RangeError("Schema is missing its top node type ('" + topType + "')");
@@ -280,7 +276,7 @@ class Attribute {
   hasDefault: boolean;
   default: any;
 
-  constructor(options: any) {
+  constructor(options: AttributeSpec) {
     this.hasDefault = Object.prototype.hasOwnProperty.call(options, "default");
     this.default = options.default;
   }
@@ -304,13 +300,13 @@ export class MarkType<S extends Schema = any> {
   /**
    * The schema that this mark type instance is part of.
    */
-  schema: S;
+  schema: Schema;
   /**
    * The spec on which the type is based.
    */
   spec: MarkSpec;
 
-  attrs: { [key: string]: any };
+  attrs: { [name: string]: any } | null;
 
   instance: Mark;
   excluded: MarkType[] | null;
@@ -342,7 +338,7 @@ export class MarkType<S extends Schema = any> {
   // Create a mark of this type. `attrs` may be `null` or an object
   // containing only some of the mark's attributes. The others, if
   // they have defaults, will be added.
-  create(attrs?: { [key: string]: any }): Mark {
+  create(attrs?: { [name: string]: any } | null): Mark {
     if (!attrs && this.instance) return this.instance;
     return new Mark(this, computeAttrs(this.attrs, attrs));
   }
